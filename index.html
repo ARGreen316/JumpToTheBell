@@ -55,7 +55,6 @@
   <button id="backToTopBtn" class="back-to-top-btn" aria-label="Back to top" onclick="scrollToTop()">&uarr;</button>
 
   <script>
-    // PASTE YOUR LIVE APPS SCRIPT WEB APP URL HERE:
     var API_URL = "https://script.google.com/macros/s/AKfycbz10CWB7iPbl60L1NThoe5QnjkHhuGTJC9Ex00m0Q_1FkDSeOTuDBVMYoIGO9Qn08UcKw/exec";
 
     var database = {};
@@ -135,6 +134,7 @@
             initializeData(parsed);
           })
           .catch(function(err) {
+            console.error("Fetch error:", err);
             document.getElementById("statusMessage").innerHTML = '<span style="color:#e50914">Failed to load vault data: ' + err.message + '</span>';
           });
       }
@@ -231,6 +231,44 @@
       return 0;
     }
 
+    function getBaseEventTitle(eventName) {
+      if (!eventName) return "";
+      var name = eventName.trim();
+      var upper = name.toUpperCase();
+
+      if (upper.indexOf("WRESTLEMANIA") !== -1) return "WrestleMania";
+      if (upper.indexOf("ROYAL RUMBLE") !== -1) return "Royal Rumble";
+      if (upper.indexOf("SUMMERSLAM") !== -1) return "SummerSlam";
+      if (upper.indexOf("SURVIVOR SERIES") !== -1) return "Survivor Series";
+      if (upper.indexOf("MONEY IN THE BANK") !== -1) return "Money in the Bank";
+      if (upper.indexOf("ELIMINATION CHAMBER") !== -1 || upper.indexOf("NO WAY OUT") !== -1) return "Elimination Chamber";
+      if (upper.indexOf("CROWN JEWEL") !== -1) return "Crown Jewel";
+      if (upper.indexOf("BAD BLOOD") !== -1) return "Bad Blood";
+      if (upper.indexOf("BACKLASH") !== -1) return "Backlash";
+      if (upper.indexOf("CLASH AT THE CASTLE") !== -1) return "Clash at the Castle";
+      if (upper.indexOf("FASTLANE") !== -1) return "Fastlane";
+      if (upper.indexOf("PAYBACK") !== -1) return "Payback";
+      if (upper.indexOf("HELL IN A CELL") !== -1) return "Hell in a Cell";
+      if (upper.indexOf("EXTREME RULES") !== -1) return "Extreme Rules";
+      if (upper.indexOf("TLC") !== -1 || upper.indexOf("TABLES, LADDERS") !== -1) return "TLC";
+      if (upper.indexOf("NIGHT OF CHAMPIONS") !== -1 || upper.indexOf("VENGEANCE") !== -1) return "Night of Champions";
+      if (upper.indexOf("KING OF THE RING") !== -1 || upper.indexOf("QUEEN OF THE RING") !== -1) return "King & Queen of the Ring";
+      if (upper.indexOf("STAND & DELIVER") !== -1 || upper.indexOf("STAND AND DELIVER") !== -1) return "NXT Stand & Deliver";
+      if (upper.indexOf("TAKEOVER") !== -1) return "NXT TakeOver";
+      if (upper.indexOf("HALLOWEEN HAVOC") !== -1) return "NXT Halloween Havoc";
+      if (upper.indexOf("HEATWAVE") !== -1) return "NXT Heatwave";
+      if (upper.indexOf("DEADLINE") !== -1) return "NXT Deadline";
+      if (upper.indexOf("BATTLEGROUND") !== -1) return "NXT Battleground";
+
+      var clean = name.replace(/\b(19\d\d|20\d\d)\b/g, "");
+      clean = clean.replace(/[-–:]?\s*(Night\s*\d+|Saturday|Sunday)/gi, "");
+      clean = clean.replace(/[:\-–].*$/, "");
+      clean = clean.replace(/\s+[0-9]+$/, "");
+      clean = clean.trim();
+
+      return clean || name;
+    }
+
     function onPPVChange() {
       var currentPPV = document.getElementById("ppvSelect").value;
       var matches = (currentPPV === "ALL") ? getAllMatches() : (database[currentPPV] || []);
@@ -263,75 +301,43 @@
       updateEventFilter();
     }
 
-    function getEventCategory(eventName) {
-      var name = (eventName || "").toUpperCase();
-      if (name.indexOf("NXT") !== -1 || name.indexOf("TAKEOVER") !== -1 || name.indexOf("STAND & DELIVER") !== -1 || name.indexOf("ARRIVAL") !== -1) {
-        return "NXT";
-      }
-      if (name.indexOf("WRESTLEMANIA") !== -1) return "WrestleMania";
-      if (name.indexOf("ROYAL RUMBLE") !== -1) return "Royal Rumble";
-      if (name.indexOf("SUMMERSLAM") !== -1) return "SummerSlam";
-      if (name.indexOf("SURVIVOR SERIES") !== -1) return "Survivor Series";
-      if (name.indexOf("MONEY IN THE BANK") !== -1) return "Money in the Bank";
-      return "Other PLEs & Specials";
-    }
-
     function updateEventFilter() {
       var currentPPV = document.getElementById("ppvSelect").value;
       var selectedYear = document.getElementById("yearFilter").value;
       var matches = (currentPPV === "ALL") ? getAllMatches() : (database[currentPPV] || []);
 
-      var eventMap = {};
+      var titles = [];
       matches.forEach(function(m) {
         if (m.event && hasValidLink(m)) {
           var matchYr = !selectedYear || getEventYear(m.event) === parseInt(selectedYear, 10);
           if (matchYr) {
-            if (!eventMap[m.event]) {
-              eventMap[m.event] = Number(m.eventDate) || 0;
+            var baseTitle = getBaseEventTitle(m.event);
+            if (baseTitle && titles.indexOf(baseTitle) === -1) {
+              titles.push(baseTitle);
             }
           }
         }
       });
 
-      var sortedEvents = Object.keys(eventMap).sort(function(a, b) {
-        return eventMap[b] - eventMap[a];
-      });
-
-      var groups = {};
-      var groupOrder = [
-        "WrestleMania",
-        "Royal Rumble",
-        "SummerSlam",
-        "Survivor Series",
-        "Money in the Bank",
-        "NXT",
-        "Other PLEs & Specials"
-      ];
-
-      groupOrder.forEach(function(g) { groups[g] = []; });
-
-      sortedEvents.forEach(function(e) {
-        var cat = getEventCategory(e);
-        if (!groups[cat]) groups[cat] = [];
-        groups[cat].push(e);
+      titles.sort(function(a, b) {
+        return a.localeCompare(b);
       });
 
       var eventFilter = document.getElementById("eventFilter");
+      var prevSelected = eventFilter.value;
       var defaultLabel = selectedYear ? ("All Events in " + selectedYear) : "All Events";
       var html = '<option value="">' + defaultLabel + '</option>';
 
-      groupOrder.forEach(function(grp) {
-        if (groups[grp] && groups[grp].length > 0) {
-          html += '<option value="ALL_CAT:' + grp + '">★ All ' + grp + ' Events (' + groups[grp].length + ')</option>';
-          html += '<optgroup label="── ' + grp + ' Shows ──">';
-          groups[grp].forEach(function(ev) {
-            html += '<option value="' + ev + '">&nbsp;&nbsp;' + ev + '</option>';
-          });
-          html += '</optgroup>';
-        }
+      titles.forEach(function(title) {
+        html += '<option value="' + title + '">' + title + '</option>';
       });
 
       eventFilter.innerHTML = html;
+
+      if (prevSelected && titles.indexOf(prevSelected) !== -1) {
+        eventFilter.value = prevSelected;
+      }
+
       renderList();
     }
 
@@ -371,12 +377,7 @@
         
         var matchEv = true;
         if (selectedEvent) {
-          if (selectedEvent.indexOf("ALL_CAT:") === 0) {
-            var targetCat = selectedEvent.replace("ALL_CAT:", "");
-            matchEv = (getEventCategory(m.event) === targetCat);
-          } else {
-            matchEv = (m.event === selectedEvent);
-          }
+          matchEv = (getBaseEventTitle(m.event) === selectedEvent);
         }
 
         var matchSrch = matchesSearchQuery(m, query);
@@ -415,7 +416,7 @@
 
       var lastRenderedYear = null;
       var lastRenderedEvent = null;
-      var isViewingMultiEvents = !selectedEvent || selectedEvent.indexOf("ALL_CAT:") === 0;
+      var isViewingMultiEvents = !selectedEvent || !selectedYear;
 
       list.innerHTML = filtered.map(function(m) {
         var bellBtn = m.bellLink ? '<a class="btn primary" href="' + m.bellLink + '" target="_blank" rel="noopener noreferrer">🔔 Bell Rings</a>' : '<span class="btn disabled">🔔 Bell Rings</span>';
